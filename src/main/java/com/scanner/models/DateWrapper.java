@@ -1,4 +1,4 @@
-package com.scanner.entity;
+package com.scanner.models;
 
 import javax.persistence.*;
 import java.util.Date;

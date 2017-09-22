@@ -1,17 +1,18 @@
 package com.scanner.mailServices;
 
 
-import com.scanner.entity.DateWrapper;
+import com.scanner.models.DateWrapper;
 import com.scanner.service.DateService;
-import com.scanner.sheetService.SheetService;
+import com.scanner.sheetExecutor.SheetExecutor;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.mail.*;
 import javax.mail.internet.InternetAddress;
-import javax.mail.search.FromTerm;
-import javax.mail.search.SearchTerm;
+import javax.mail.search.*;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.*;
-import java.util.regex.Pattern;
 
 
 public class MailCheckerImpl implements MailChecker {
@@ -20,15 +21,17 @@ public class MailCheckerImpl implements MailChecker {
 	@Autowired
 	private MailSender mailSender;
 	@Autowired
-	private SheetService sheetService;
+	private SheetExecutor sheetService;
 
 	private Date lastDate = null;
-
 	private String user = null;
 	private String password = null;
 	private int answersAmount = 0;
 	private String senderName = null;
 	private String rightAnswers = null;
+	private ArrayList<String> explanations = new ArrayList<>();
+	private HashMap<String, String> userDetails = new HashMap<>();
+	private ArrayList<String> rightAnswersList = new ArrayList<>();
 
 	public MailCheckerImpl(String user, String password, int answersAmount, String senderName, String rightAnswers) {
 		this.user = user;
@@ -41,10 +44,10 @@ public class MailCheckerImpl implements MailChecker {
 	public void check() {
 		String host = "imap.googlemail.com";
 		String mailStoreType = "imaps";
-		int rightAnswersAmount = 0;
 		String content = null;
-		String result = null;
-		ArrayList<String> rightAnswersList = new ArrayList<>(Arrays.asList(rightAnswers.split(",")));
+		rightAnswersList = new ArrayList<>(Arrays.asList(rightAnswers.split(",")));
+		populateExplanations();
+
 		try {
 			Properties properties = new Properties();
 			properties.put("mail.pop3.host", host);
@@ -59,76 +62,85 @@ public class MailCheckerImpl implements MailChecker {
 			Store store = emailSession.getStore(mailStoreType);
 			store.connect(host, user, password);
 			Folder emailFolder = store.getFolder("INBOX");
-			emailFolder.open(Folder.READ_ONLY);
+			emailFolder.open(Folder.READ_WRITE);
 
-			SearchTerm sender = new FromTerm(new InternetAddress(senderName));
-			Message messages[] = emailFolder.search(sender);
-
-			String regEx = new StringBuilder("1:\\s\\d+\\s+(\\d:\\s\\d+\\s+){")
-					.append(answersAmount - 1)
-					.append("}Имя:\\s[А-Яа-я]+\\s+Телефон:\\s\\d+\\s+Email:\\s\\w+@\\w.+\\s+")
-					.toString();
-			Pattern pattern = Pattern.compile(regEx);
-			HashMap<String, String> userDetails = new HashMap<>();
-
-			if (lastDate == null) {
+			if (lastDate == null)
 				lastDate = service.getLastDate().getCurrentDate();
-			}
 
-			for (int i = 0, n = messages.length; i < n; i++) {
-				Message message = messages[i];
-				String messageContent = message.getContent().toString();
-				if (message.getSentDate().after(lastDate)) {
-					if (pattern.matcher(messageContent).matches()) {
-						System.out.println(lastDate);
-						System.out.println(message.getSentDate());
-						System.out.println("Subject: " + message.getSubject());
-						System.out.println("From: " + message.getFrom()[0]);
-						System.out.println(messageContent);
-						content = messageContent;
-						lastDate = message.getSentDate();
-						service.addLastDate(new DateWrapper(message.getSentDate()));
-					}
+			SearchTerm lastSentDate = new SentDateTerm(ComparisonTerm.GT, lastDate);
+			SearchTerm sender = new FromTerm(new InternetAddress(senderName));
+			Message messages[] = emailFolder.search(new AndTerm(lastSentDate, sender));
+
+			for (Message message : messages) {
+				if (!message.isSet(Flags.Flag.SEEN)) {
+					content = message.getContent().toString();
+					lastDate = message.getSentDate();
+					service.addLastDate(new DateWrapper(message.getSentDate()));
+					shapeAndSendAnswer(content);
 				}
-			}
-			if (content != null) {
-				ArrayList<String> splitContent = new ArrayList<>(Arrays.asList(content.split("\\s\\n")));
-				for (int i = 0; i < splitContent.size(); i++) {
-					if (i <= answersAmount - 1) {
-						if (splitContent.get(i).substring(3).equals(rightAnswersList.get(i))) {
-							System.out.println(i);
-							rightAnswersAmount++;
-						}
-					} else if (splitContent.size() - i == 3) {
-						userDetails.put("Имя", splitContent.get(i).substring(5));
-					} else if (splitContent.size() - i == 2) {
-						userDetails.put("Телефон", splitContent.get(i).substring(9));
-					} else if (splitContent.size() - i == 1) {
-						userDetails.put("Email", splitContent.get(i).substring(7));
-					}
-				}
-				String url = sheetService
-						.createSheet(lastDate, userDetails.get("Имя"), userDetails.get("Телефон"), userDetails.get("Email"));
-				result = new StringBuilder("Процент правильных ответов: ")
-						.append(rightAnswersAmount*100 / rightAnswersList.size())
-						.append("%\n")
-						.append(url)
-						.toString();
-				System.out.println(userDetails.get("Email"));
-				System.out.println(result);
-				mailSender.sendMessage(userDetails.get("Email"), result);
-			} else {
-				System.out.println("Нет сообщений");
 			}
 			emailFolder.close(false);
 			store.close();
 
-		} catch (NoSuchProviderException e) {
-			e.printStackTrace();
-		} catch (MessagingException e) {
-			e.printStackTrace();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	private void populateExplanations() {
+		String fileName = System.getProperty("user.dir") + "\\src\\main\\resources\\explanations.txt";
+		try {
+			Scanner scan = new Scanner(new InputStreamReader(new FileInputStream(fileName), "cp1251"));
+			scan.useDelimiter("\\d\\)\\s");
+			try {
+				while(scan.hasNext()){
+					explanations.add(scan.next().replaceAll("\\r\\n", ""));
+				}
+			} finally {
+				scan.close();
+			}
+		} catch(IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	private void shapeAndSendAnswer(String content) {
+		ArrayList<String> specificExplanation = new ArrayList<>();
+		int rightAnswersAmount = 0;
+		StringBuilder result = new StringBuilder();
+
+		ArrayList<String> splitContent = new ArrayList<>(Arrays.asList(content.split("\\s\\n")));
+		for (int i = 0; i < splitContent.size(); i++) {
+			if (i <= answersAmount - 1) {
+				if (splitContent.get(i).substring(3).equals(rightAnswersList.get(i))) {
+					rightAnswersAmount++;
+				} else {
+					specificExplanation.add("Ошибка в вопросе №" + (i+1) + ". Пояснение:\n" + explanations.get(i) + "\n");
+				}
+			} else {
+				switch (splitContent.size() - i) {
+					case 3:
+						userDetails.put("Имя", splitContent.get(i).substring(5));
+						break;
+					case 2:
+						userDetails.put("Телефон", splitContent.get(i).substring(9));
+						break;
+					case 1:
+						userDetails.put("Email", splitContent.get(i).substring(7));
+				}
+			}
+		}
+		String url = sheetService
+				.executeSheet(lastDate, userDetails.get("Имя"), userDetails.get("Телефон"), userDetails.get("Email"));
+		result.append("Процент правильных ответов: ")
+				.append(rightAnswersAmount * 100 / rightAnswersList.size())
+				.append("%\n");
+		if (specificExplanation.size() > 0) {
+			for (String explanation : specificExplanation) {
+				result.append(explanation);
+			}
+		}
+		result.append(url);
+		mailSender.sendMessage(userDetails.get("Email"), result.toString());
 	}
 }

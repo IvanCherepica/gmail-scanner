@@ -4,9 +4,6 @@ import com.scanner.mailServices.MailChecker;
 import com.scanner.mailServices.MailCheckerImpl;
 import com.scanner.mailServices.MailSender;
 import com.scanner.mailServices.MailSenderImpl;
-import com.scanner.sheetService.SheetService;
-import com.scanner.timer.Timer;
-import com.scanner.sheetService.SheetServiceImpl;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -42,17 +39,7 @@ public class ApplicationContextConfig {
 	}
 
 	@Bean
-	public SheetService sheetService() {
-		return new SheetServiceImpl();
-	}
-
-	@Bean
 	public MailSender sender() {
 		return new MailSenderImpl(username, password);
-	}
-
-	@Bean
-	public Timer timer() {
-		return new Timer();
 	}
 }

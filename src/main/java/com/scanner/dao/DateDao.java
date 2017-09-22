@@ -1,6 +1,6 @@
 package com.scanner.dao;
 
-import com.scanner.entity.DateWrapper;
+import com.scanner.models.DateWrapper;
 
 /**
  * Created by User on 17.09.2017.

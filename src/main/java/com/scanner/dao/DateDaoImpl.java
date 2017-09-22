@@ -1,6 +1,6 @@
 package com.scanner.dao;
 
-import com.scanner.entity.DateWrapper;
+import com.scanner.models.DateWrapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
