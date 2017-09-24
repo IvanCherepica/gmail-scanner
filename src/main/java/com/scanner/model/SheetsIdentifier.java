@@ -1,4 +1,4 @@
-package com.scanner.models;
+package com.scanner.model;
 
 import javax.persistence.*;
 
@@ -6,8 +6,7 @@ import javax.persistence.*;
 @Table(name = "sheet_id")
 public class SheetsIdentifier {
 	@Id
-	@GeneratedValue(strategy= GenerationType.AUTO)
-	private int id;
+	private final int id = 1;
 
 	@Column(name = "identifier",  nullable = false)
 	private String identifier;
@@ -16,10 +15,6 @@ public class SheetsIdentifier {
 
 	public SheetsIdentifier(String identifier) {
 		this.identifier = identifier;
-	}
-
-	public void setId(int id) {
-		this.id = id;
 	}
 
 	public String getIdentifier() {

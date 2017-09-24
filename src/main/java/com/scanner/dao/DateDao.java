@@ -1,12 +1,12 @@
 package com.scanner.dao;
 
-import com.scanner.models.DateWrapper;
+import com.scanner.model.DateWrapper;
 
 /**
  * Created by User on 17.09.2017.
  */
 public interface DateDao {
-	DateWrapper getLastDate();
+	DateWrapper LastDate();
 
-	void addDate(DateWrapper dateWrapper);
+	void rewriteLastDate(DateWrapper dateWrapper);
 }

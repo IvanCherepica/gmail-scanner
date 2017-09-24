@@ -1,7 +1,7 @@
 package com.scanner.service;
 
 import com.scanner.dao.SheetsIdDao;
-import com.scanner.models.SheetsIdentifier;
+import com.scanner.model.SheetsIdentifier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -11,12 +11,12 @@ public class SheetsIdServiceImpl implements SheetsIdService {
 	private SheetsIdDao sheetsIdRepository;
 
 	@Override
-	public SheetsIdentifier getLastIdentifier() {
-		return sheetsIdRepository.getLastIdentifier();
+	public SheetsIdentifier LastIdentifier() {
+		return sheetsIdRepository.LastIdentifier();
 	}
 
 	@Override
-	public void addIdentifier(SheetsIdentifier sheetsIdentifier) {
-		sheetsIdRepository.addIdentifier(sheetsIdentifier);
+	public void rewriteIdentifier(SheetsIdentifier sheetsIdentifier) {
+		sheetsIdRepository.rewriteIdentifier(sheetsIdentifier);
 	}
 }

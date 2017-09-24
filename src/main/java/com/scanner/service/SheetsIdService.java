@@ -1,12 +1,12 @@
 package com.scanner.service;
 
-import com.scanner.models.SheetsIdentifier;
+import com.scanner.model.SheetsIdentifier;
 
 /**
  * Created by User on 20.09.2017.
  */
 public interface SheetsIdService {
-	SheetsIdentifier getLastIdentifier();
+	SheetsIdentifier LastIdentifier();
 
-	void addIdentifier(SheetsIdentifier sheetsIdentifier);
+	void rewriteIdentifier(SheetsIdentifier sheetsIdentifier);
 }

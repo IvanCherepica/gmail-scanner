@@ -1,4 +1,4 @@
-package com.scanner.models;
+package com.scanner.model;
 
 import javax.persistence.*;
 import java.util.Date;
@@ -7,8 +7,7 @@ import java.util.Date;
 @Table(name = "date")
 public class DateWrapper {
 	@Id
-	@GeneratedValue(strategy= GenerationType.AUTO)
-	private int id;
+	private final int id = 1;
 
 	@Column(name = "date",  nullable = false)
 	private long date;
@@ -26,10 +25,6 @@ public class DateWrapper {
 
 	public void setCurrentDate(Date date) {
 		this.date = date.getTime();
-	}
-
-	public void setId(int id) {
-		this.id = id;
 	}
 
 }

@@ -13,7 +13,7 @@ import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.*;
 import com.google.api.services.sheets.v4.Sheets;
-import com.scanner.models.SheetsIdentifier;
+import com.scanner.model.SheetsIdentifier;
 import com.scanner.service.SheetsIdService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -99,7 +99,7 @@ public class SheetExecutorImpl implements SheetExecutor {
 		Spreadsheet requestBody = new Spreadsheet();
 		try {
 			if (currentSpreadsheetId == null) {
-				SheetsIdentifier storedSpreadsheet = sheetsIdService.getLastIdentifier();
+				SheetsIdentifier storedSpreadsheet = sheetsIdService.LastIdentifier();
 				if (storedSpreadsheet != null) {
 					currentSpreadsheetId = storedSpreadsheet.getIdentifier();
 					spreadsheetUrl = "https://docs.google.com/spreadsheets/d/" + currentSpreadsheetId +"/edit";
@@ -122,7 +122,7 @@ public class SheetExecutorImpl implements SheetExecutor {
 		Sheets.Spreadsheets.Create request = sheetsService.spreadsheets().create(requestBody);
 		Spreadsheet response = request.execute();
 		currentSpreadsheetId = response.getSpreadsheetId();
-		sheetsIdService.addIdentifier(new SheetsIdentifier(currentSpreadsheetId));
+		sheetsIdService.rewriteIdentifier(new SheetsIdentifier(currentSpreadsheetId));
 
 		List<Request> requests = new ArrayList<>();
 		List<CellData> cellDataList = new ArrayList<>();

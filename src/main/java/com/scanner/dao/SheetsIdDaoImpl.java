@@ -1,13 +1,12 @@
 package com.scanner.dao;
 
-import com.scanner.models.DateWrapper;
-import com.scanner.models.SheetsIdentifier;
+import com.scanner.model.SheetsIdentifier;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.persistence.EntityManager;
+import javax.persistence.NoResultException;
 import javax.persistence.PersistenceContext;
-import java.util.Date;
 
 @Transactional
 @Repository
@@ -17,20 +16,22 @@ public class SheetsIdDaoImpl implements SheetsIdDao {
 
 
 	@Override
-	public SheetsIdentifier getLastIdentifier() {
-		SheetsIdentifier getLastIdentifier = null;
+	public SheetsIdentifier LastIdentifier() {
+		SheetsIdentifier LastIdentifier = null;
 		try {
-			getLastIdentifier = (SheetsIdentifier) entityManager
+			LastIdentifier = (SheetsIdentifier) entityManager
 					.createQuery("SELECT u FROM SheetsIdentifier u WHERE u.id =1").getSingleResult();
+		} catch (NoResultException e) {
+			System.out.println("Не найдена таблица для записи.");
+			System.out.println("Будет сгенерированна новая таблица.");
 		} catch (Exception e) {
-
+			e.printStackTrace();
 		}
-		return getLastIdentifier;
+		return LastIdentifier;
 	}
 
 	@Override
-	public void addIdentifier(SheetsIdentifier sheetsIdentifier) {
-		sheetsIdentifier.setId(1);
+	public void rewriteIdentifier(SheetsIdentifier sheetsIdentifier) {
 		entityManager.merge(sheetsIdentifier);
 	}
 }

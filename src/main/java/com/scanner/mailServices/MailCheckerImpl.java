@@ -1,7 +1,7 @@
 package com.scanner.mailServices;
 
 
-import com.scanner.models.DateWrapper;
+import com.scanner.model.DateWrapper;
 import com.scanner.service.DateService;
 import com.scanner.sheetExecutor.SheetExecutor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +21,7 @@ public class MailCheckerImpl implements MailChecker {
 	@Autowired
 	private MailSender mailSender;
 	@Autowired
-	private SheetExecutor sheetService;
+	private SheetExecutor sheetExecutor;
 
 	private Date lastDate = null;
 	private String user = null;
@@ -65,7 +65,7 @@ public class MailCheckerImpl implements MailChecker {
 			emailFolder.open(Folder.READ_WRITE);
 
 			if (lastDate == null)
-				lastDate = service.getLastDate().getCurrentDate();
+				lastDate = service.LastDate().getCurrentDate();
 
 			SearchTerm lastSentDate = new SentDateTerm(ComparisonTerm.GT, lastDate);
 			SearchTerm sender = new FromTerm(new InternetAddress(senderName));
@@ -75,7 +75,7 @@ public class MailCheckerImpl implements MailChecker {
 				if (!message.isSet(Flags.Flag.SEEN)) {
 					content = message.getContent().toString();
 					lastDate = message.getSentDate();
-					service.addLastDate(new DateWrapper(message.getSentDate()));
+					service.rewriteLastDate(new DateWrapper(message.getSentDate()));
 					shapeAndSendAnswer(content);
 				}
 			}
@@ -89,17 +89,12 @@ public class MailCheckerImpl implements MailChecker {
 
 	private void populateExplanations() {
 		String fileName = System.getProperty("user.dir") + "\\src\\main\\resources\\explanations.txt";
-		try {
-			Scanner scan = new Scanner(new InputStreamReader(new FileInputStream(fileName), "cp1251"));
-			scan.useDelimiter("\\d\\)\\s");
-			try {
-				while(scan.hasNext()){
-					explanations.add(scan.next().replaceAll("\\r\\n", ""));
-				}
-			} finally {
-				scan.close();
+		try (Scanner scan = new Scanner(new InputStreamReader(new FileInputStream(fileName), "cp1251"))
+				.useDelimiter("\\d\\)\\s")) {
+			while (scan.hasNext()) {
+				explanations.add(scan.next().replaceAll("\\r\\n", ""));
 			}
-		} catch(IOException e) {
+		}catch(IOException e) {
 			throw new RuntimeException(e);
 		}
 	}
@@ -130,7 +125,7 @@ public class MailCheckerImpl implements MailChecker {
 				}
 			}
 		}
-		String url = sheetService
+		String url = sheetExecutor
 				.executeSheet(lastDate, userDetails.get("Имя"), userDetails.get("Телефон"), userDetails.get("Email"));
 		result.append("Процент правильных ответов: ")
 				.append(rightAnswersAmount * 100 / rightAnswersList.size())
