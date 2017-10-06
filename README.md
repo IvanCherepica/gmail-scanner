@@ -24,7 +24,7 @@
   5) Пояснения по пятому вопросу.
 </h6>
 <p>Run the application.</p>
-<h2>To build a file</h2>
+<h2>To build a jar file</h2>
 <ol>
   <li>Open the console and switch to the directory with downloaded unarchive zip file from
   GitHub (or any other folder in which you want to create a jar file). 
