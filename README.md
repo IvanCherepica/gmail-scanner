@@ -9,10 +9,9 @@
   received.mail.subject=title</br>
   spreadsheet.url=https://docs.google.com/spreadsheets/d/***/edit#gid=0</br>
 </h6>
+<p>And txt file with name "caption.txt" with the title of sent messages</p>
 <p>Then create a txt file with name "explanations.txt" in the root with similar content:</p>
 <h6>
-  Заголовок ответа: "Результаты теста"
-
   1) Пояснения по первому вопросу.
 
   2) Пояснения по второму вопросу.
