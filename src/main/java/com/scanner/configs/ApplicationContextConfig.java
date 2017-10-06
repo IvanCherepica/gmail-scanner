@@ -12,7 +12,9 @@ import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Properties;
+import java.util.Scanner;
 
 @Configuration
 @PropertySource("classpath:application.properties")
@@ -30,7 +32,8 @@ public class ApplicationContextConfig {
 
 	@Bean
 	public MailChecker checkMails() {
-		return new MailCheckerImpl(username, password, answersAmount, sender, rightAnswers);
+		ArrayList<String> explanations = getExplanations();
+		return new MailCheckerImpl(username, password, answersAmount, sender, explanations, rightAnswers);
 	}
 
 	@Bean
@@ -41,5 +44,19 @@ public class ApplicationContextConfig {
 	@Bean
 	public static PropertySourcesPlaceholderConfigurer propertyConfigInDev() {
 		return new PropertySourcesPlaceholderConfigurer();
+	}
+
+	private ArrayList<String> getExplanations() {
+		ArrayList<String> explanations = new ArrayList<>();
+		String fileName = "explanations.txt";
+		try (Scanner scan = new Scanner(new FileInputStream(fileName))
+				.useDelimiter("\\d\\)\\s")) {
+			while (scan.hasNext()) {
+				explanations.add(scan.next().replaceAll("\\r\\n", ""));
+			}
+		}catch(IOException e) {
+			throw new RuntimeException(e);
+		}
+		return explanations;
 	}
 }

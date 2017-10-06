@@ -1,5 +1,6 @@
 package com.scanner.mailServices;
 
+import com.scanner.DTO.Letter;
 import com.scanner.properties.MailProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -10,8 +11,7 @@ import javax.mail.internet.MimeMessage;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Properties;
-import java.util.Scanner;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -33,9 +33,8 @@ public class MailSenderImpl implements MailSender {
 	}
 
 	@Override
-	public void sendMessage(String recipient, String content) {
+	public void sendMessage(List<Letter> letters) {
 		launched = true;
-
 		Properties props = new Properties();
 		props.put("mail.smtp.auth", mailProp.getOutboxAuth());
 		props.put("mail.smtp.starttls.enable", mailProp.getOutboxStartTls());
@@ -49,33 +48,35 @@ public class MailSenderImpl implements MailSender {
 		});
 
 		try {
-			Message message = new MimeMessage(session);
-			message.setFrom(new InternetAddress(username));
-			message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(recipient));
-			message.setSubject(getSendSubject());
-			message.setText(content);
-			Transport.send(message);
-			System.out.println("Email Sent Successfully");
+			Transport transport = session.getTransport("smtp");
+			transport.connect(mailProp.getOutboxHost(), username, password);
+
+			for (Letter letter : letters) {
+				Message message = new MimeMessage(session);
+				message.setFrom(new InternetAddress(username));
+				message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(letter.getRecipient()));
+				message.setSubject(getSendSubject());
+				message.setText(letter.getContent());
+				transport.send(message);
+				System.out.println("Email Sent Successfully");
+			}
+
+			transport.close();
 		} catch (MessagingException e) {
 			throw new RuntimeException(e);
-
 		}
 		launched = false;
 	}
 
 	private String getSendSubject() {
-		String subject = "";
-		try (Scanner scan = new Scanner(new FileInputStream("explanations.txt"))) {
-			while (scan.hasNextLine()) {
-				String s = scan.nextLine();
-				if (s.matches("Заголовок ответа: \"[А-Яа-я\\s*]+\""))
-					subject = s.replaceAll("Заголовок ответа: \"", "")
-							.replaceAll("\"(.+)?", "");
+		StringBuilder subject = new StringBuilder();
+		try (Scanner scan = new Scanner(new FileInputStream("caption.txt"))) {
+			while (scan.hasNext()) {
+				subject.append(scan.next());
 			}
-
 		}catch(IOException e) {
 			throw new RuntimeException(e);
 		}
-		return subject;
+		return subject.toString();
 	}
 }

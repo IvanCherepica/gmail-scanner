@@ -2,6 +2,7 @@ package com.scanner.commandCatcher;
 
 import com.scanner.mailServices.MailChecker;
 import com.scanner.mailServices.MailSender;
+import com.scanner.sheetExecutor.SheetExecutor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -14,6 +15,8 @@ public class Catcher implements Runnable {
 	private MailSender mailSender;
 	@Autowired
 	private MailChecker mailChecker;
+	@Autowired
+	private SheetExecutor sheetExecutor;
 
 	private String command = "";
 
@@ -31,7 +34,6 @@ public class Catcher implements Runnable {
 	@Override
 	public void run() {
 		Scanner in = new Scanner(System.in);
-
 		while (in.hasNext()) {
 			command = in.next();
 		}
@@ -41,7 +43,7 @@ public class Catcher implements Runnable {
 	private void stopApp() {
 		if (command.equals("stop")) {
 			stopped = true;
-			if (!mailChecker.isLaunched() && !mailSender.isLaunched())
+			if (!mailChecker.isLaunched() && !mailSender.isLaunched() && !sheetExecutor.isLaunched())
 				System.exit(0);
 		}
 	}

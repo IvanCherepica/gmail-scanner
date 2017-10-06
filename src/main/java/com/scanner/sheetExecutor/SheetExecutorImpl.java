@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 @Service
 @PropertySource("classpath:application.properties")
 public class SheetExecutorImpl implements SheetExecutor {
+	private boolean launched;
 
 	@Value("${spreadsheet.url}")
 	private String spreadsheetUrl = null;
@@ -94,15 +95,13 @@ public class SheetExecutorImpl implements SheetExecutor {
 				.build();
 	}
 
-	public void appendData(Date sentDate, String name, String phone, String email) {
-		SimpleDateFormat dateFormat = new SimpleDateFormat("dd.MM.yyy 'в' HH:mm:ss");
-		String date = dateFormat.format(sentDate);
+	public void appendData(List<List<Object>> userDetailsList) {
+		launched = true;
 		String spreadsheetId = getSpreadsheetId();
 		String range = "A1";
-		Object[] userDetails = {name, phone, email, date};
-		List<List<Object>> values = Collections.singletonList(Arrays.asList(userDetails));
+
 		ValueRange body = new ValueRange()
-				.setValues(values);
+				.setValues(userDetailsList);
 
 		try {
 			Sheets service = getSheetsService();
@@ -113,11 +112,17 @@ public class SheetExecutorImpl implements SheetExecutor {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		launched = false;
 	}
 
 	private String getSpreadsheetId() {
 		Pattern pattern = Pattern.compile("/");
 		return pattern.split(spreadsheetUrl)[5];
+	}
+
+	@Override
+	public boolean isLaunched() {
+		return launched;
 	}
 
 	/*private String createSheet(Spreadsheet requestBody) throws IOException, GeneralSecurityException {
