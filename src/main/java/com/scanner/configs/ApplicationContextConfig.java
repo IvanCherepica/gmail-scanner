@@ -4,42 +4,42 @@ import com.scanner.mailServices.MailChecker;
 import com.scanner.mailServices.MailCheckerImpl;
 import com.scanner.mailServices.MailSender;
 import com.scanner.mailServices.MailSenderImpl;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
+import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
 
 @Configuration
+@PropertySource("classpath:application.properties")
 public class ApplicationContextConfig {
-	private String username = null;
-	private String password = null;
-	private int answersAmount = 0;
-	private String sender = null;
-	private String rightAnswers = null;
+	@Value("${own.addres}")
+	private String username;
+	@Value("${password}")
+	private String password;
+	@Value("${answers.amount}")
+	private int answersAmount;
+	@Value("${sender}")
+	private String sender;
+	@Value("${right.answers}")
+	private String rightAnswers;
 
 	@Bean
 	public MailChecker checkMails() {
-		FileInputStream fis;
-		Properties property = new Properties();
-		try {
-			fis = new FileInputStream("src/main/resources/application.properties");
-			property.load(fis);
-			sender = property.getProperty("sender");
-			username = property.getProperty("username");
-			password = property.getProperty("password");
-			answersAmount = Integer.parseInt(property.getProperty("answers.amount"));
-			rightAnswers = property.getProperty("right.answers");
-		} catch (IOException e) {
-			System.err.println("ОШИБКА: Файл свойств отсуствует!");
-		}
-
 		return new MailCheckerImpl(username, password, answersAmount, sender, rightAnswers);
 	}
 
 	@Bean
 	public MailSender sender() {
 		return new MailSenderImpl(username, password);
+	}
+
+	@Bean
+	public static PropertySourcesPlaceholderConfigurer propertyConfigInDev() {
+		return new PropertySourcesPlaceholderConfigurer();
 	}
 }

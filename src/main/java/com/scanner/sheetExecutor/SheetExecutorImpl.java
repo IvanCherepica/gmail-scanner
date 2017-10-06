@@ -13,9 +13,9 @@ import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.*;
 import com.google.api.services.sheets.v4.Sheets;
-import com.scanner.model.SheetsIdentifier;
-import com.scanner.service.SheetsIdService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -24,14 +24,13 @@ import java.io.InputStreamReader;
 import java.security.GeneralSecurityException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.regex.Pattern;
 
 @Service
+@PropertySource("classpath:application.properties")
 public class SheetExecutorImpl implements SheetExecutor {
-	@Autowired
-	private SheetsIdService sheetsIdService;
 
-	private String currentSpreadsheetId = null;
-
+	@Value("${spreadsheet.url}")
 	private String spreadsheetUrl = null;
 
 	private final String APPLICATION_NAME =
@@ -95,34 +94,37 @@ public class SheetExecutorImpl implements SheetExecutor {
 				.build();
 	}
 
-	public String executeSheet(Date sentDate, String name, String phone, String email) {
-		Spreadsheet requestBody = new Spreadsheet();
+	public void appendData(Date sentDate, String name, String phone, String email) {
+		SimpleDateFormat dateFormat = new SimpleDateFormat("dd.MM.yyy 'в' HH:mm:ss");
+		String date = dateFormat.format(sentDate);
+		String spreadsheetId = getSpreadsheetId();
+		String range = "A1";
+		Object[] userDetails = {name, phone, email, date};
+		List<List<Object>> values = Collections.singletonList(Arrays.asList(userDetails));
+		ValueRange body = new ValueRange()
+				.setValues(values);
+
 		try {
-			if (currentSpreadsheetId == null) {
-				SheetsIdentifier storedSpreadsheet = sheetsIdService.LastIdentifier();
-				if (storedSpreadsheet != null) {
-					currentSpreadsheetId = storedSpreadsheet.getIdentifier();
-					spreadsheetUrl = "https://docs.google.com/spreadsheets/d/" + currentSpreadsheetId +"/edit";
-					appendData(sentDate, name, phone, email);
-				} else {
-					spreadsheetUrl = createSheet(requestBody);
-					appendData(sentDate, name, phone, email);
-				}
-			} else {
-				appendData(sentDate, name, phone, email);
-			}
-		} catch (IOException | GeneralSecurityException e) {
+			Sheets service = getSheetsService();
+			service.spreadsheets().values()
+					.append(spreadsheetId, range, body)
+					.setValueInputOption("RAW")
+					.execute();
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		return spreadsheetUrl;
 	}
 
-	private String createSheet(Spreadsheet requestBody) throws IOException, GeneralSecurityException {
+	private String getSpreadsheetId() {
+		Pattern pattern = Pattern.compile("/");
+		return pattern.split(spreadsheetUrl)[5];
+	}
+
+	/*private String createSheet(Spreadsheet requestBody) throws IOException, GeneralSecurityException {
 		Sheets sheetsService = createSheetsService();
 		Sheets.Spreadsheets.Create request = sheetsService.spreadsheets().create(requestBody);
 		Spreadsheet response = request.execute();
 		currentSpreadsheetId = response.getSpreadsheetId();
-		sheetsIdService.rewriteIdentifier(new SheetsIdentifier(currentSpreadsheetId));
 
 		List<Request> requests = new ArrayList<>();
 		List<CellData> cellDataList = new ArrayList<>();
@@ -197,22 +199,5 @@ public class SheetExecutorImpl implements SheetExecutor {
 				.execute();
 
 		return response.getSpreadsheetUrl();
-	}
-
-	private void appendData(Date sentDate, String name, String phone, String email) throws IOException {
-		SimpleDateFormat dateFormat = new SimpleDateFormat("dd.MM.yyy 'в' HH:mm:ss");
-		String date = dateFormat.format(sentDate);
-
-		Sheets service = getSheetsService();
-		String range = "A1";
-		Object[] userDetails = {name, phone, email, date};
-		List<List<Object>> values = Collections.singletonList(Arrays.asList(userDetails));
-		ValueRange body = new ValueRange()
-				.setValues(values);
-
-		service.spreadsheets().values()
-				.append(currentSpreadsheetId, range, body)
-				.setValueInputOption("RAW")
-				.execute();
-	}
+	}*/
 }

@@ -7,22 +7,17 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
-public class Timer implements Runnable {
+public class CheckingStarter implements Runnable {
 	@Autowired
 	private MailChecker mailChecker;
+
 	@Autowired
 	private Catcher catcher;
 
 	@Scheduled(fixedRate = 10000)
 	public void run() {
-		checkCommand();
-		mailChecker.check();
-		checkCommand();
-	}
+		if (!catcher.isStopped())
+			mailChecker.check();
 
-	private void checkCommand() {
-		if (catcher.getCommand().equals("stop")) {
-			System.exit(0);
-		}
 	}
 }

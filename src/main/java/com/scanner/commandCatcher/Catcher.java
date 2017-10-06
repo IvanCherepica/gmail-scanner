@@ -1,17 +1,31 @@
 package com.scanner.commandCatcher;
 
+import com.scanner.mailServices.MailChecker;
+import com.scanner.mailServices.MailSender;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.Scanner;
 
 @Component
 public class Catcher implements Runnable {
+	@Autowired
+	private MailSender mailSender;
+	@Autowired
+	private MailChecker mailChecker;
 
 	private String command = "";
+
+	private boolean stopped = false;
 
 	Catcher() {
 		Thread thread = new Thread(this, "Command listener");
 		thread.start();
+	}
+
+	public boolean isStopped() {
+		return stopped;
 	}
 
 	@Override
@@ -23,8 +37,12 @@ public class Catcher implements Runnable {
 		}
 	}
 
-	public String getCommand() {
-		return command;
+	@Scheduled(fixedRate = 1000)
+	private void stopApp() {
+		if (command.equals("stop")) {
+			stopped = true;
+			if (!mailChecker.isLaunched() && !mailSender.isLaunched())
+				System.exit(0);
+		}
 	}
-
 }
