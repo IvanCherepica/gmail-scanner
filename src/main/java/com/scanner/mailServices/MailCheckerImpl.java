@@ -7,15 +7,21 @@ import com.scanner.sheetExecutor.SheetExecutor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import javax.mail.*;
 import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
 import javax.mail.search.*;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static javax.mail.Flags.Flag.SEEN;
 
 @PropertySource("classpath:application.properties")
 public class MailCheckerImpl implements MailChecker {
@@ -36,6 +42,9 @@ public class MailCheckerImpl implements MailChecker {
 	private String rightAnswers;
 	private List<String> explanations;
 	private List<String> rightAnswersList;
+	private Pattern nameSearch = Pattern.compile("Имя\\s?:\\s?[А-Яа-я]*-?\\s?[А-Яа-я]*");
+	private Pattern dateSearch = Pattern.compile("\\d\\d\\.\\d\\d\\.\\d{4}\\sв\\s\\d\\d:\\d\\d:\\d\\d");
+	private Pattern phoneSearch = Pattern.compile("Телефон\\s?:\\s?((8|\\+7)[\\- ]?)?(\\(?\\d{3}\\)?[\\- ]?)?[\\d\\- ]{7,10}");
 
 	public MailCheckerImpl(String user, String password, int answersAmount, String senderName,
 						   List<String> explanations, String rightAnswers) {
@@ -75,7 +84,7 @@ public class MailCheckerImpl implements MailChecker {
 			emailFolder.open(Folder.READ_WRITE);
 
 			SearchTerm sender = new FromTerm(new InternetAddress(senderName));
-			Flags seen = new Flags(Flags.Flag.SEEN);
+			Flags seen = new Flags(SEEN);
 			FlagTerm unseenFlagTerm = new FlagTerm(seen, false);
 
 			Message messages[] = emailFolder.search(new AndTerm(unseenFlagTerm, sender));
@@ -97,41 +106,36 @@ public class MailCheckerImpl implements MailChecker {
 		launched = false;
 	}
 
-	private void sandeMessagesAndWriteTable(List<String> contentList) {
+	private void sandeMessagesAndWriteTable(List<String> contentList) throws Exception {
 		List<List<Object>> userDetailsList = new ArrayList<>();
 		List<Letter> letters = new ArrayList<>();
 		for (String content: contentList) {
-			String emailAddress = "";
+			List<String> emailAddress = new ArrayList<>();
 			int rightAnswersAmount = 0;
 			StringBuilder result = new StringBuilder();
 			List<String> specificExplanation = new ArrayList<>();
-			List<String> splitContent = new ArrayList<>(Arrays.asList(content.split("\\s\\n")));
+			List<String> splitContent = new ArrayList<>(Arrays.asList(content.split("<br>")));
 			List<Object> userDetails = new ArrayList<>();
-			for (int i = 0; i < splitContent.size(); i++) {
-				if (i <= answersAmount - 1) {
+			try {
+				for (int i = 0; i < answersAmount; i++) {
 					if (splitContent.get(i).substring(3).equals(rightAnswersList.get(i))) {
 						rightAnswersAmount++;
 					} else {
 						specificExplanation.add("Ошибка в вопросе №" + (i + 1) + ". Пояснение:\n" + explanations.get(i) + "\n\n");
 					}
-				} else {
-					switch (splitContent.size() - i) {
-						case 4:
-							userDetails.add(splitContent.get(i).substring(5));
-							break;
-						case 3:
-							userDetails.add(splitContent.get(i).substring(9));
-							break;
-						case 2:
-							String email = splitContent.get(i).substring(7);
-							userDetails.add(email);
-							emailAddress = email;
-							break;
-						case 1:
-							userDetails.add(splitContent.get(i));
-					}
 				}
+			} catch (IndexOutOfBoundsException e) {
+				System.out.println(e.getMessage());
 			}
+
+
+
+			emailAddress = getEmailAddress(content);
+			String stringAddress = emailAddress.toString();
+			userDetails.add(getUserDetail(content, nameSearch, true));
+			userDetails.add(getUserDetail(content, phoneSearch, true));
+			userDetails.add(stringAddress.substring(1, stringAddress.length()-1));
+			userDetails.add(getUserDetail(content, dateSearch, false));
 			userDetailsList.add(userDetails);
 			if (!specificExplanation.isEmpty()) {
 				String lastComment = specificExplanation.get(specificExplanation.size() - 1);
@@ -152,6 +156,46 @@ public class MailCheckerImpl implements MailChecker {
 		updateSpreadSheet(userDetailsList);
 		sendMail(letters);
 	}
+
+	private List<String> getEmailAddress(String content) {
+		List<String> emails = new ArrayList<>();
+		Pattern searchPattern = Pattern.compile("Email.?(.\\w)?:.\\w+.?\\w+?\\@\\w+.?\\w+");
+		Matcher searchMatcher = searchPattern.matcher(content);
+		Pattern cutPattern = Pattern.compile("[^:\\s?]*$");
+		while(searchMatcher.find()) {
+			String rec = content.substring(searchMatcher.start(), searchMatcher.end());
+			Matcher cutMatcher = cutPattern.matcher(rec);
+			if (cutMatcher.find()) {
+				String email = rec.substring(cutMatcher.start(), cutMatcher.end());
+				if (!email.isEmpty()) {
+					emails.add(email);
+				}
+			}
+		}
+		return emails;
+	}
+
+	private Object getUserDetail(String content, Pattern pattern, boolean isCut) {
+		String detail = "";
+		Matcher detailMatcher = pattern.matcher(content);
+		Pattern cutDetail = Pattern.compile("[^:\\s?]*$");
+		while(detailMatcher.find()) {
+			String rawDetail = content.substring(detailMatcher.start(), detailMatcher.end());
+			if (isCut) {
+				Matcher cutMatcher = cutDetail.matcher(rawDetail);
+				if (cutMatcher.find()) {
+					String nameX = rawDetail.substring(cutMatcher.start(), cutMatcher.end());
+					if (!nameX.isEmpty())
+						detail = nameX;
+				}
+			} else {
+				detail = rawDetail;
+			}
+		}
+		return detail;
+	}
+
+
 
 	private void updateSpreadSheet(List<List<Object>> userDetailsList) {
 		new Thread(

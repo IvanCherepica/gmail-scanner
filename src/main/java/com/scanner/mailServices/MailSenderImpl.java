@@ -52,9 +52,11 @@ public class MailSenderImpl implements MailSender {
 			transport.connect(mailProp.getOutboxHost(), username, password);
 
 			for (Letter letter : letters) {
+				String str = letter.getRecipients().toString();
+				String addresses = str.substring(1, str.length()-1);
 				Message message = new MimeMessage(session);
 				message.setFrom(new InternetAddress(username));
-				message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(letter.getRecipient()));
+				message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(addresses));
 				message.setSubject(getSendSubject());
 				message.setText(letter.getContent());
 				transport.send(message);
@@ -71,8 +73,8 @@ public class MailSenderImpl implements MailSender {
 	private String getSendSubject() {
 		StringBuilder subject = new StringBuilder();
 		try (Scanner scan = new Scanner(new FileInputStream("caption.txt"))) {
-			while (scan.hasNext()) {
-				subject.append(scan.next());
+			while (scan.hasNextLine()) {
+				subject.append(scan.nextLine());
 			}
 		}catch(IOException e) {
 			throw new RuntimeException(e);

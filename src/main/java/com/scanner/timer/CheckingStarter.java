@@ -5,6 +5,7 @@ import com.scanner.mailServices.MailChecker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 
 @Component
 public class CheckingStarter implements Runnable {
@@ -20,4 +21,5 @@ public class CheckingStarter implements Runnable {
 			mailChecker.check();
 
 	}
+
 }
