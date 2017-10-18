@@ -65,7 +65,7 @@ public class MailCheckerImpl implements MailChecker {
 		String host = mailProp.getInboxHost();
 		String mailStoreType = mailProp.getInboxStoreType();
 		int quantity = 0;
-		List<String> contentList = new ArrayList<>();
+		Map<Message,String> contentMap = new HashMap<>();
 		rightAnswersList = new ArrayList<>(Arrays.asList(rightAnswers.split(",")));
 		try {
 			Properties properties = new Properties();
@@ -92,12 +92,13 @@ public class MailCheckerImpl implements MailChecker {
 				if (message.getSubject().contains(mailSubject)) {
 					SimpleDateFormat dateFormat = new SimpleDateFormat("dd.MM.yyy 'в' HH:mm:ss");
 					String date = dateFormat.format(message.getSentDate());
-					contentList.add(message.getContent().toString() + date);
+					String content = message.getContent().toString() + date;
+					contentMap.put(message, content);
 					quantity++;
 				}
 			}
 			if (quantity > 0)
-				sandeMessagesAndWriteTable(contentList);
+				sandeMessagesAndWriteTable(contentMap);
 			emailFolder.close(false);
 			store.close();
 		} catch (Exception e) {
@@ -106,55 +107,89 @@ public class MailCheckerImpl implements MailChecker {
 		launched = false;
 	}
 
-	private void sandeMessagesAndWriteTable(List<String> contentList) throws Exception {
+	private void sandeMessagesAndWriteTable(Map<Message,String> contentMap) throws Exception {
 		List<List<Object>> userDetailsList = new ArrayList<>();
 		List<Letter> letters = new ArrayList<>();
-		for (String content: contentList) {
-			List<String> emailAddress = new ArrayList<>();
+		Set<Message> unReadableMessages = new HashSet<>();
+		for (Map.Entry<Message, String> entry : contentMap.entrySet()) {
+			String content = entry.getValue();
+			Message message = entry.getKey();
+
+			List<String> emailAddress;
 			int rightAnswersAmount = 0;
 			StringBuilder result = new StringBuilder();
 			List<String> specificExplanation = new ArrayList<>();
-			List<String> splitContent = new ArrayList<>(Arrays.asList(content.split("<br>")));
+			List<String> answersList = getAnswersList(content);
 			List<Object> userDetails = new ArrayList<>();
 			try {
-				for (int i = 0; i < answersAmount; i++) {
-					if (splitContent.get(i).substring(3).equals(rightAnswersList.get(i))) {
-						rightAnswersAmount++;
-					} else {
-						specificExplanation.add("Ошибка в вопросе №" + (i + 1) + ". Пояснение:\n" + explanations.get(i) + "\n\n");
+				if (answersList.size() == answersAmount) {
+					for (int i = 0; i < answersAmount; i++) {
+						if (answersList.get(i).equals(rightAnswersList.get(i))) {
+							rightAnswersAmount++;
+						} else {
+							specificExplanation.add("Ошибка в вопросе №" + (i + 1) + ". Пояснение:\n" + explanations.get(i) + "\n\n");
+						}
 					}
+				} else {
+					unReadableMessages.add(message);
 				}
 			} catch (IndexOutOfBoundsException e) {
 				System.out.println(e.getMessage());
+				unReadableMessages.add(message);
 			}
 
+			if (!unReadableMessages.contains(message)) {
+				emailAddress = getEmailAddress(content);
+				String stringAddress = emailAddress.toString();
+				String name = getUserDetail(content, nameSearch, true);
+				String phone = getUserDetail(content, phoneSearch, true);
+				String address = stringAddress.substring(1, stringAddress.length() - 1);
+				String date = getUserDetail(content, dateSearch, false);
 
-
-			emailAddress = getEmailAddress(content);
-			String stringAddress = emailAddress.toString();
-			userDetails.add(getUserDetail(content, nameSearch, true));
-			userDetails.add(getUserDetail(content, phoneSearch, true));
-			userDetails.add(stringAddress.substring(1, stringAddress.length()-1));
-			userDetails.add(getUserDetail(content, dateSearch, false));
-			userDetailsList.add(userDetails);
-			if (!specificExplanation.isEmpty()) {
-				String lastComment = specificExplanation.get(specificExplanation.size() - 1);
-				specificExplanation.remove(specificExplanation.size() - 1);
-				specificExplanation.add(lastComment.substring(0, lastComment.length()-2));
-			}
-			result.append("Процент правильных ответов: ")
-					.append(rightAnswersAmount * 100 / rightAnswersList.size())
-					.append("%\n\n");
-			if (specificExplanation.size() > 0) {
-				for (String explanation : specificExplanation) {
-					result.append(explanation);
+				if (!name.isEmpty() && !address.isEmpty()) {
+					userDetails.add(name);
+					userDetails.add(phone);
+					userDetails.add(address);
+					userDetails.add(date);
+					userDetailsList.add(userDetails);
+					if (!specificExplanation.isEmpty()) {
+						String lastComment = specificExplanation.get(specificExplanation.size() - 1);
+						specificExplanation.remove(specificExplanation.size() - 1);
+						specificExplanation.add(lastComment.substring(0, lastComment.length() - 2));
+					}
+					result.append("Процент правильных ответов: ")
+							.append(rightAnswersAmount * 100 / rightAnswersList.size())
+							.append("%\n\n");
+					if (specificExplanation.size() > 0) {
+						for (String explanation : specificExplanation) {
+							result.append(explanation);
+						}
+					}
+					letters.add(new Letter(emailAddress, result.toString()));
+				} else {
+					unReadableMessages.add(message);
 				}
 			}
-			letters.add(new Letter(emailAddress, result.toString()));
 		}
-
+		doNotRead(unReadableMessages);
 		updateSpreadSheet(userDetailsList);
 		sendMail(letters);
+	}
+
+	private List<String> getAnswersList(String content) {
+		List<String> answers = new ArrayList<>();
+		List<String> splitContent = new ArrayList<>(Arrays.asList(content.split("<br>")));
+		Pattern pattern = Pattern.compile("^\\w+:\\s?\\w+$");
+		Pattern cutPattern = Pattern.compile("[^:\\s?]*$");
+		for (String answer : splitContent) {
+			if (pattern.matcher(answer).matches()) {
+				Matcher cutMatcher = cutPattern.matcher(answer);
+				if (cutMatcher.find()) {
+					answers.add(answer.substring(cutMatcher.start(), cutMatcher.end()));
+				}
+			}
+		}
+		return answers;
 	}
 
 	private List<String> getEmailAddress(String content) {
@@ -175,7 +210,7 @@ public class MailCheckerImpl implements MailChecker {
 		return emails;
 	}
 
-	private Object getUserDetail(String content, Pattern pattern, boolean isCut) {
+	private String getUserDetail(String content, Pattern pattern, boolean isCut) {
 		String detail = "";
 		Matcher detailMatcher = pattern.matcher(content);
 		Pattern cutDetail = Pattern.compile("[^:\\s?]*$");
@@ -195,7 +230,34 @@ public class MailCheckerImpl implements MailChecker {
 		return detail;
 	}
 
+	private void doNotRead(Set<Message> unReadableMessages) {
+		String host = mailProp.getInboxHost();
+		String mailStoreType = mailProp.getInboxStoreType();
+		try {
+			Properties properties = new Properties();
+			properties.put("mail.pop3.host", host);
+			properties.put("mail.pop3.port", mailProp.getInboxPort());
+			properties.put("mail.pop3.starttls.enable", mailProp.getInboxStartTls());
 
+			Session emailSession = Session.getInstance(properties, new javax.mail.Authenticator() {
+				protected PasswordAuthentication getPasswordAuthentication() {
+					return new PasswordAuthentication(user, password);
+				}
+			});
+			Store store = emailSession.getStore(mailStoreType);
+			store.connect(host, user, password);
+			Folder emailFolder = store.getFolder(mailProp.getInboxStoreFolder());
+			emailFolder.open(Folder.READ_WRITE);
+
+			Message[] messages = new Message[unReadableMessages.size()];
+			unReadableMessages.toArray(messages);
+			emailFolder.setFlags(messages, new Flags(Flags.Flag.SEEN), false);
+
+			store.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 
 	private void updateSpreadSheet(List<List<Object>> userDetailsList) {
 		new Thread(

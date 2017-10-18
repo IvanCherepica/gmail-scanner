@@ -99,16 +99,16 @@ public class SheetExecutorImpl implements SheetExecutor {
 		launched = true;
 		String spreadsheetId = getSpreadsheetId();
 		String range = "A1";
-
-		ValueRange body = new ValueRange()
-				.setValues(userDetailsList);
+		ValueRange body = new ValueRange().setValues(userDetailsList);
 
 		try {
-			Sheets service = getSheetsService();
-			service.spreadsheets().values()
-					.append(spreadsheetId, range, body)
-					.setValueInputOption("RAW")
-					.execute();
+			if (!userDetailsList.isEmpty()) {
+				Sheets service = getSheetsService();
+				service.spreadsheets().values()
+						.append(spreadsheetId, range, body)
+						.setValueInputOption("RAW")
+						.execute();
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
